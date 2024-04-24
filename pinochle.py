@@ -1,23 +1,5 @@
-# import pyCardDeck as pycd 
-
-# pinochle_ranks = ['9', '10', 'J', 'Q', 'K', 'A']
-# pinochle_suits = ['Spades', 'Hearts', 'Clubs', 'Diamonds']
-# pinochle_deck = pycd.Deck()
-
-# json_cards = pinochle_deck.export('json')
-# print(json_cards)
-
-# import pyCardDeck 
-# import yaml
-
-# my_pinochle_deck = yaml.load(open('pinochle_deck.yml'))
-# print(my_pinochle_deck)
-
 import random
 import json
-
-# get meld options from meld.json
-# meld_options = json.load(open('meld.json'))
 
 card_suits = ['Hearts', 'Diamonds', 'Clubs', 'Spades']
 card_names = ['9', 'J', 'Q', 'K', '10', 'A']
@@ -95,21 +77,30 @@ class Hand:
 
     def show_hand(self, shorthand=False):
         if shorthand:
+            top_border = '┌────────┐ ' * len(self.cards)
+            bot_border = '└────────┘ ' * len(self.cards)
+            
+            print(top_border)
             hand_str = ''
             for card in self.cards:
+                if len(card.name) == 1:
+                    card.name = ' ' + card.name
                 hand_str += f'| {card.name}{card.suit[0]}({card.rank}) | '
                 
             print(hand_str)
+
+            print(bot_border)
         else:
             for card in self.cards:
                 print(card)
 
     def calc_meld(self):
         hand_meld = Meld(self)
-        run_values = hand_meld.get_run_values()
-        for suit in run_values:
-            for item in run_values[suit]:
-                print(f'{suit}: {item}')
+        hand_meld.show_melds()
+        # run_values = hand_meld.get_run_values()
+        # for suit in run_values:
+        #     for item in run_values[suit]:
+        #         print(f'{suit}: {item}')
 
 class Deck:
     def __init__(self):
@@ -196,9 +187,139 @@ class Team:
 class Meld:
     def __init__(self, hand):
         self.hand = hand
-        self.melds = []
+        self.melds = {} 
+        self.check_sets()
+
+    def check_sets(self):
+        # check for 4 of a kind
+        valid_ranks = [2, 3, 4, 6]
+        cards = self.hand.cards
+        
+        for rank in valid_ranks:
+            # checking for rank
+            # example: rank 2
+            card_name = card_names[rank - 1]
+            if rank == 6:
+                card_name = 'A'
+            set_meld = [card for card in cards if card.rank == rank]
+
+            # if there are at least 4 cards of the same rank
+            if len(set_meld) >= 4:
+                # check if all 4 suits are represented
+                # if so, add to melds
+
+                # get all suits in the set
+                suits = [card.suit for card in set_meld]
+
+                # if there are 4 unique suits
+                if len(set(suits)) == 4:
+                    multiplier = 1
+                    # if there are 8 cards of the same rank
+                    if len(set_meld) == 8:
+                        multiplier = 10
+
+                    # J (rank 2) is worth 40 points
+                    # Q (rank 3) is worth 60 points
+                    # K (rank 4) is worth 80 points
+                    # A (rank 6) is worth 100 points
+                    total_points = rank * 20
+                    if rank == 6:
+                        total_points += 80
+                    
+                    # include multiplier
+                    total_points *= multiplier
+
+                    meld_name = f'{str(total_points)} {card_name}s'
+                    self.melds[meld_name] = set_meld
+
+    def check_sequences(self):
+        pass
+        # check for marriages
+        # K and Q of the same suit
+
+        # check for run
+        # 5 cards in sequence of the same suit, starting with J
+
+        # check for double run
+        # 2 instances of 5 cards in sequence of the same suit, starting with J
+
+    def check_specials(self):
+        pass
+        # check for diss
+        # 9s of trump suit
+
+        # check for pinochle
+        # J of diamonds and Q of spades
+
+        # check for double pinochle
+        # 2 instances of J of diamonds and Q of spades
 
     def get_run_values(self):
+        # initial hand
+        hand = self.hand.cards
+        run_checker = {
+            'Hearts': [],
+            'Diamonds': [],
+            'Clubs': [],
+            'Spades': []
+        }
+        for card in hand:
+            # print("  Card in the hand is: ")
+            # print(card)
+            # print("  ")
+
+            # input("   press enter to run next check. Next check is to see if card would be in a run")
+
+            if card.rank < 2:
+                # print("  Card rank is less than 2, so skipping")
+                continue
+                
+            # print("  Card rank is greater than 2, " + str(card.rank) + ", so adding card to run_checker array.")
+            run_checker[card.suit].append(card)
+
+            # input("   card has been checked and processed, press enter to move to the next card.")
+
+            # print("  ")
+            # print("  current run_checker array is: ")
+            # for suit in run_checker:
+            #     print("      " + suit + ": ")
+            #     for card in run_checker[suit]:
+            #         print("          " + str(card.name) + "-" + str(card.suit))
+            # print("  ")
+
+        for suit in run_checker:
+            # checking how much of a run each suit has
+            unique_values = len(set([card.rank for card in run_checker[suit]]))
+            # print("   ")
+            # print("   number of unique values in run_checker array for " + suit + " is: " + str(unique_values))
+            # print("   ")    
+
+            base_run_percentage = str(int( (unique_values / 5) * 100 )) + "%"
+            # print("   base run percentage for " + suit + " is: " + base_run_percentage) 
+
+        # get longest run in run_checker array
+        longest_run = None
+        for suit in run_checker:
+            if longest_run is None or len(run_checker[suit]) > len(longest_run):
+                longest_run = run_checker[suit]
+
+        print("   ")
+        print("   longest run is: ")
+        for card in longest_run:
+            print("      " + str(card.name) + "-" + str(card.suit))
+
+        # calculate current run value in points
+        # where 150 points is a full run
+        unique_values = len(set([card.rank for card in longest_run]))
+        run_percentage = unique_values / 5
+        current_run_value = run_percentage * 150
+
+        print("   ")
+        print("   current run value is: " + str(current_run_value))
+
+        quit()
+
+    def old_get_run_values(self):
         # find all sequences of cards in a suit
         # where card.rank is greater than or equal to 2
         run_values = {}
@@ -208,7 +329,10 @@ class Meld:
                 if card.suit == suit and card.rank >= 2:
                     run_values[suit]['values'] = []
                     run_values[suit]['values'].append(card.rank)
-            run_values[suit]['values'].sort()
+            if len(run_values[suit]['values']) == 0:
+                del run_values[suit]
+            else:
+                run_values[suit]['values'].sort()
 
         print(run_values)
         input('Press enter to continue')
@@ -224,6 +348,10 @@ class Meld:
 
     def __repr__(self):
         return f'Meld with {len(self.melds)} melds'
+
+    def show_melds(self):
+        for meld in self.melds:
+            print(meld)
 
 deck = Deck()
 deck.shuffle()
