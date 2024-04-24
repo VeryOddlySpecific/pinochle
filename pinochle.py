@@ -3,6 +3,18 @@ import json
 
 card_suits = ['Hearts', 'Diamonds', 'Clubs', 'Spades']
 card_names = ['9', 'J', 'Q', 'K', '10', 'A']
+meld_values = {
+    '4 Aces': 100,
+    '4 Kings': 80,
+    '4 Queens': 60,
+    '4 Jacks': 40,
+    'run': 150,
+    'double run': 300,
+    'marriage': 40,
+    'double marriage': 80,
+    'pinochle': 40,
+    'double pinochle': 300
+}
 
 class Suit:
     def __init__(self, name, symbol):
@@ -189,6 +201,14 @@ class Meld:
         self.hand = hand
         self.melds = {} 
         self.check_sets()
+        self.check_sequences()
+        self.check_specials()
+        self.meld_value = self.calc_meld_value()
+
+    def calc_meld_value(self):
+        total_value = 0
+        for meld in self.melds:
+            total_value += self.melds[meld]['points']
 
     def check_sets(self):
         # check for 4 of a kind
@@ -224,7 +244,7 @@ class Meld:
                     # A (rank 6) is worth 100 points
                     total_points = rank * 20
                     if rank == 6:
-                        total_points += 80
+                        total_points -= 20
                     
                     # include multiplier
                     total_points *= multiplier
@@ -232,16 +252,59 @@ class Meld:
                     meld_name = f'{str(total_points)} {card_name}s'
                     self.melds[meld_name] = set_meld
 
+            else:
+                pc_of_single_meld = len(set_meld) / 4
+                pc_of_double_meld = len(set_meld) / 8
+                single_meld_name  = f'{pc_of_single_meld * 100}% of {card_name}s around'
+                double_meld_name  = f'{pc_of_double_meld * 100}% of double {card_name}s around'
+                self.melds[single_meld_name] = set_meld
+                self.melds[double_meld_name] = set_meld
+
     def check_sequences(self):
-        pass
+        # pass
         # check for marriages
         # K and Q of the same suit
+        for suit in card_suits:
+            king = [card for card in self.hand.cards if card.rank == 4 and card.suit == suit]
+            queen = [card for card in self.hand.cards if card.rank == 3 and card.suit == suit]
+            if len(king) > 0 and len(queen) > 0 and not (len(king) == 2 and len(queen) == 2):
+                # add to melds
+                meld_name = f'marriage of {suit}'
+                self.melds[meld_name] = king + queen
+            if len(king) == 2 and len(queen) == 2:
+                # add to melds
+                meld_name = f'double marriage of {suit}'
+                self.melds[meld_name] = king + queen
 
         # check for run
         # 5 cards in sequence of the same suit, starting with J
+        for suit in card_suits:
+            # get all cards that qualify to be part of a run in the given suit
+            run_cards = [card for card in self.hand.cards if card.suit == suit and card.rank >= 2]
 
-        # check for double run
-        # 2 instances of 5 cards in sequence of the same suit, starting with J
+            if len(run_cards) >= 5 and len(run_cards) < 10:
+                # check if single run
+                # e.g. J, Q, K, 10, A
+                run_set_check = set([card.rank for card in run_cards])
+
+                if len(run_set_check) == 5:
+                    # add to melds
+                    meld_name = f'run of {suit}'
+                    self.melds[meld_name] = run_cards
+
+            # check if double run
+            elif len(run_cards) == 10:
+                meld_name = f'double run of {suit}'
+                self.melds[meld_name] = run_cards
+
+            else:
+                # get how close the run is to being a meld in a percentage
+                pc_of_single_run = len(run_cards) / 5
+                pc_of_double_run = len(run_cards) / 10
+                single_run_name  = f'{pc_of_single_run * 100}% of run of {suit}'
+                double_run_name  = f'{pc_of_double_run * 100}% of double run of {suit}'
+                self.melds[single_run_name] = run_cards
+                self.melds[double_run_name] = run_cards
 
     def check_specials(self):
         pass
@@ -250,101 +313,28 @@ class Meld:
 
         # check for pinochle
         # J of diamonds and Q of spades
+        j_diamonds  = [card for card in self.hand.cards if card.rank == 2 and card.suit == 'Diamonds']
+        q_spades    = [card for card in self.hand.cards if card.rank == 3 and card.suit == 'Spades']
+        num_jd      = len(j_diamonds)
+        num_qs      = len(q_spades)
+        pinochle    = 0
 
-        # check for double pinochle
-        # 2 instances of J of diamonds and Q of spades
+        if num_jd > 0 and num_qs > 0:            
+            if num_jd + num_qs == 4:
+                pinochle = 'double'
+            elif num_jd and num_qs:
+                pinochle = 'single'
 
-    def get_run_values(self):
-        # initial hand
-        hand = self.hand.cards
-        run_checker = {
-            'Hearts': [],
-            'Diamonds': [],
-            'Clubs': [],
-            'Spades': []
-        }
-        for card in hand:
-            # print("  Card in the hand is: ")
-            # print(card)
-            # print("  ")
+        if pinochle:
+            meld_name = f'{pinochle} pinochle'
+            self.melds[meld_name] = j_diamonds + q_spades
 
-            # input("   press enter to run next check. Next check is to see if card would be in a run")
+        # get how close the pinochle is to being a meld
+        # render as x legs of pinochle
+        num_legs    = num_jd + num_qs
+        meld_name   = f'{num_legs} leg(s) of pinochle'
+        self.melds[meld_name] = j_diamonds + q_spades
 
-            if card.rank < 2:
-                # print("  Card rank is less than 2, so skipping")
-                continue
-                
-            # print("  Card rank is greater than 2, " + str(card.rank) + ", so adding card to run_checker array.")
-            run_checker[card.suit].append(card)
-
-            # input("   card has been checked and processed, press enter to move to the next card.")
-
-            # print("  ")
-            # print("  current run_checker array is: ")
-            # for suit in run_checker:
-            #     print("      " + suit + ": ")
-            #     for card in run_checker[suit]:
-            #         print("          " + str(card.name) + "-" + str(card.suit))
-            # print("  ")
-
-        for suit in run_checker:
-            # checking how much of a run each suit has
-            unique_values = len(set([card.rank for card in run_checker[suit]]))
-            # print("   ")
-            # print("   number of unique values in run_checker array for " + suit + " is: " + str(unique_values))
-            # print("   ")    
-
-            base_run_percentage = str(int( (unique_values / 5) * 100 )) + "%"
-            # print("   base run percentage for " + suit + " is: " + base_run_percentage) 
-
-        # get longest run in run_checker array
-        longest_run = None
-        for suit in run_checker:
-            if longest_run is None or len(run_checker[suit]) > len(longest_run):
-                longest_run = run_checker[suit]
-
-        print("   ")
-        print("   longest run is: ")
-        for card in longest_run:
-            print("      " + str(card.name) + "-" + str(card.suit))
-
-        # calculate current run value in points
-        # where 150 points is a full run
-        unique_values = len(set([card.rank for card in longest_run]))
-        run_percentage = unique_values / 5
-        current_run_value = run_percentage * 150
-
-        print("   ")
-        print("   current run value is: " + str(current_run_value))
-
-        quit()
-
-    def old_get_run_values(self):
-        # find all sequences of cards in a suit
-        # where card.rank is greater than or equal to 2
-        run_values = {}
-        for suit in card_suits:
-            run_values[suit] = {}
-            for card in self.hand.cards:
-                if card.suit == suit and card.rank >= 2:
-                    run_values[suit]['values'] = []
-                    run_values[suit]['values'].append(card.rank)
-            if len(run_values[suit]['values']) == 0:
-                del run_values[suit]
-            else:
-                run_values[suit]['values'].sort()
-
-        print(run_values)
-        input('Press enter to continue')
-        # run percentages
-        for suit, run_val in run_values:
-            # get number of unique values in run
-            # e.g. 3, 3, 5 has 2 unique values
-            unique_values = len(set(run_val['values']))
-            run_percentage = unique_values / 5
-            run_values[suit]['percentage'] = run_percentage
-
-        return run_values
 
     def __repr__(self):
         return f'Meld with {len(self.melds)} melds'
